@@ -6,35 +6,46 @@ const app = new Hono();
 
 app.get('/', (c) => c.json({ 
     status: true, 
-    message: "xCHAMi MD Bypass API is Online! 🛡️",
-    instruction: "Use /yt?q=song+name to download."
+    message: "xCHAMi MD Bypass API (Space Supported) 🚀" 
 }));
 
 app.get('/yt', async (c) => {
-    const query = c.req.query('q');
+    // 1. URL එකෙන් Query එක ලබා ගැනීම
+    let query = c.req.query('q');
     const customName = c.req.query('name');
 
-    if (!query) return c.json({ status: false, message: "Query required!" }, 400);
+    if (!query) return c.json({ status: false, message: "Please provide a query (name or link)." }, 400);
+
+    // 2. '+' ලකුණු තිබේ නම් ඒවා හිස්තැන් (spaces) බවට පත් කිරීම (Auto-Fix)
+    query = decodeURIComponent(query).replace(/\+/g, ' ');
 
     try {
-        // 1. YouTube එකේ සින්දුව හෝ වීඩියෝව සෙවීම
+        // 3. YouTube Search
         const search = await ytSearch(query);
-        if (!search.videos.length) return c.json({ status: false, message: "No results found." }, 404);
+        if (!search.videos.length) return c.json({ status: false, message: "No videos found." }, 404);
         
         const video = search.videos[0];
-        const videoId = video.videoId;
+        const videoUrl = video.url;
         const title = video.title;
-        const thumbnail = video.thumbnail;
 
-        // 2. YouTube Blocking bypass කරන logic එක (Using a stable conversion helper)
-        // අපි මෙතනදී පාවිච්චි කරන්නේ පසිද්ධ YouTube conversion API එකක backend එකක්
-        const apiResponse = await fetch(`https://api.zenon.pw/api/v1/yt/download?id=${videoId}`);
-        const apiData = await apiResponse.json();
+        // 4. Cobalt API Logic (Bypass)
+        const cobaltApi = "https://cobalt.tools/api/json";
+        
+        // Audio Request
+        const audioRes = await fetch(cobaltApi, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: videoUrl, videoQuality: "720", downloadMode: "audio" })
+        });
+        const audioData = await audioRes.json();
 
-        if (!apiData || !apiData.status) {
-            // Fallback: තවත් backend එකක් උත්සාහ කිරීම
-            throw new Error("Primary bypass method failed.");
-        }
+        // Video Request
+        const videoRes = await fetch(cobaltApi, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: videoUrl, videoQuality: "720", downloadMode: "video" })
+        });
+        const videoData = await videoRes.json();
 
         const finalName = customName || title;
 
@@ -43,26 +54,25 @@ app.get('/yt', async (c) => {
             creator: "xCHAMi MD",
             result: {
                 title: title,
-                id: videoId,
-                thumbnail: thumbnail,
+                id: video.videoId,
+                thumbnail: video.thumbnail,
                 fileName: finalName,
-                // Video & Audio links (Converted & Stabilized)
                 video: {
-                    url: apiData.video_url || apiData.download_url,
+                    url: videoData.url || audioData.url,
                     quality: "720p",
                     caption: `🎥 ${title}`
                 },
                 mp3: {
-                    url: apiData.audio_url || apiData.download_url,
+                    url: audioData.url || videoData.url,
                     mimetype: "audio/mpeg",
                     fileName: `${finalName}.mp3`
                 },
                 recording: {
-                    url: apiData.audio_url || apiData.download_url,
+                    url: audioData.url || videoData.url,
                     ptt: true
                 },
                 document: {
-                    url: apiData.audio_url || apiData.download_url,
+                    url: audioData.url || videoData.url,
                     mimetype: "audio/mpeg",
                     fileName: `${finalName}.mp3`
                 }
@@ -70,10 +80,9 @@ app.get('/yt', async (c) => {
         });
 
     } catch (err) {
-        console.error("Bypass Error:", err.message);
         return c.json({ 
             status: false, 
-            message: "All bypass methods failed. YouTube high security.",
+            message: "YouTube high security block.",
             error: err.message 
         }, 500);
     }
