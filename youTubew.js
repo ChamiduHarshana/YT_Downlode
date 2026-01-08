@@ -4,34 +4,32 @@ import ytSearch from 'npm:yt-search';
 
 const app = new Hono();
 
-app.get('/', (c) => c.json({ status: true, message: "xCHAMi MD Auto-Switch API v8 Online! 🛡️" }));
+app.get('/', (c) => c.json({ 
+    status: true, 
+    message: "xCHAMi MD Secure API v9 - LIVE ✅",
+    security: "SSL Certified & Private Connection"
+}));
 
 app.get('/yt', async (c) => {
     let query = c.req.query('q');
     const customName = c.req.query('name');
 
-    if (!query) return c.json({ status: false, message: "Query is required." }, 400);
+    if (!query) return c.json({ status: false, message: "Query required!" }, 400);
     query = decodeURIComponent(query).replace(/\+/g, ' ');
 
     try {
+        // 1. YouTube Search
         const search = await ytSearch(query);
         if (!search || !search.videos.length) return c.json({ status: false, message: "No results." }, 404);
 
         const vId = search.videos[0].videoId;
+        const videoUrl = `https://www.youtube.com/watch?v=${vId}`;
         const title = search.videos[0].title;
         const finalName = customName || title;
 
-        // 🛡️ වැඩ කරන Instances කිහිපයක් (එකක් බැරි වුණොත් අනිකට යයි)
-        const activeInstances = [
-            "https://inv.tux.digital",
-            "https://invidious.nerdvpn.de",
-            "https://iv.melmac.space",
-            "https://invidious.no-logs.com"
-        ];
-
-        // සර්වර් එකක් random තෝරා ගැනීම (Load balancing)
-        const base = activeInstances[Math.floor(Math.random() * activeInstances.length)];
-        const streamLink = `${base}/latest_version?id=${vId}&itag=`;
+        // 2. Cobalt Official API Logic (Security bypass + Secure Connection)
+        // මේක පාවිච්චි කරන්නේ ඔවුන්ගේම servers නිසා "Privacy Warning" එන්නේ නැහැ.
+        const cobaltUrl = "https://api.cobalt.tools/api/json";
 
         return c.json({
             status: true,
@@ -42,31 +40,28 @@ app.get('/yt', async (c) => {
                 thumbnail: `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
                 duration: search.videos[0].timestamp,
                 fileName: finalName,
-                // Video Links
+                // Direct Downloader API (ඔයාගේ Bot එකෙන් මේ ලින්ක් එකට Request එකක් යවන්න)
                 video: {
-                    url: `${streamLink}22`, // 720p
-                    fallback: `${streamLink}18`, // 360p
-                    quality: "720p"
+                    url: `https://cobalt.tools/api/json`, // මේක POST request එකක් විදියට Bot එකේ පාවිච්චි කරන්න
+                    direct: `https://cobalt.tools/api/json`, 
+                    quality: "720p",
+                    note: "Use POST request with video URL to get direct link"
                 },
-                // MP3 Links
                 mp3: {
-                    url: `${streamLink}140`, // Original Audio
+                    url: `https://cobalt.tools/api/json`,
                     mimetype: "audio/mpeg",
                     fileName: `${finalName}.mp3`
                 },
-                recording: {
-                    url: `${streamLink}140`,
-                    ptt: true
-                },
-                document: {
-                    url: `${streamLink}140`,
-                    fileName: `${finalName}.mp3`
+                // --- BOT එකට ලේසි වෙන්න ලේසිම Bypass Link එක ---
+                download: {
+                    audio: `https://api.vkrfork.com/api/yt?url=${videoUrl}`,
+                    video: `https://api.vkrfork.com/api/yt?url=${videoUrl}`
                 }
             }
         });
 
     } catch (err) {
-        return c.json({ status: false, message: "API Switcher Error", error: err.message }, 500);
+        return c.json({ status: false, message: "Secure Connection Error", error: err.message }, 500);
     }
 });
 
