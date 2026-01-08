@@ -4,39 +4,57 @@ import ytSearch from 'npm:yt-search';
 
 const app = new Hono();
 
-app.get('/', (c) => c.json({ status: true, message: "xCHAMi MD Ultra-Stable API v4 Online 💎" }));
+// සර්වර් එක වැඩද බලන්න (Home Page)
+app.get('/', (c) => c.json({ status: true, message: "xCHAMi MD Bypass PRO Online 🛡️" }));
 
 app.get('/yt', async (c) => {
     let query = c.req.query('q');
     const customName = c.req.query('name');
 
-    if (!query) return c.json({ status: false, message: "Please provide a query." }, 400);
-
-    // පිරිසිදුව Query එක සකසා ගැනීම
+    if (!query) return c.json({ status: false, message: "Query required!" }, 400);
     query = decodeURIComponent(query).replace(/\+/g, ' ');
 
     try {
-        // 1. YouTube Search
+        // 1. YouTube Search (ඉක්මනින් Video එක සොයාගැනීම)
         const search = await ytSearch(query);
-        if (!search.videos.length) return c.json({ status: false, message: "No results found." }, 404);
+        if (!search.videos.length) return c.json({ status: false, message: "No results." }, 404);
         
         const video = search.videos[0];
-        const videoUrl = video.url;
+        const videoId = video.videoId;
         const title = video.title;
 
-        // 2. Powerful Bypass Logic (Stable Infrastructure)
-        // අපි මෙතනදී පාවිච්චි කරන්නේ ඉතා වේගවත් සහ Block නොවන Download Server එකක්
-        const fetchUrl = `https://api.vkrfork.com/api/yt?url=${videoUrl}`;
-        
-        const response = await fetch(fetchUrl);
-        const data = await response.json();
+        // 2. Invidious Instance Rotation (DNS Errors මගහැරීමට ස්ථාවර සර්වර්ස් 3ක්)
+        // මේ සර්වර්ස් ලෝකයේ ඕනෑම තැනකට වැඩ කරනවා.
+        const instances = [
+            `https://invidious.flokinet.to/api/v1/videos/${videoId}`,
+            `https://iv.melmac.space/api/v1/videos/${videoId}`,
+            `https://invidious.privacydev.net/api/v1/videos/${videoId}`
+        ];
 
-        if (!data || !data.data) {
-            throw new Error("External API failure.");
+        let videoData = null;
+        let errorMsg = "";
+
+        // එක සර්වර් එකක් බැරි වුනොත් අනිකට මාරු වෙනවා (Auto-fix)
+        for (const url of instances) {
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    videoData = await res.json();
+                    break; 
+                }
+            } catch (e) {
+                errorMsg = e.message;
+                continue;
+            }
         }
 
-        // ඩවුන්ලෝඩ් ලින්ක්ස් ලබා ගැනීම (විවිධ format තිබේ නම් ඒවා සොයා ගැනීම)
-        const downloadLinks = data.data;
+        if (!videoData) throw new Error("All instances failed: " + errorMsg);
+
+        // 3. Audio සහ Video ලිංක් වෙන් කරගැනීම
+        // Invidious වල audio_formats සහ formatStreams වෙන වෙනම එනවා.
+        const audioFile = videoData.adaptiveFormats.find(f => f.type.includes('audio/webm') || f.type.includes('audio/mp4'));
+        const videoFile = videoData.formatStreams.find(f => f.quality === '720p') || videoData.formatStreams[0];
+
         const finalName = customName || title;
 
         return c.json({
@@ -44,39 +62,34 @@ app.get('/yt', async (c) => {
             creator: "xCHAMi MD",
             result: {
                 title: title,
-                id: video.videoId,
-                duration: video.timestamp,
+                id: videoId,
                 thumbnail: video.thumbnail,
+                duration: video.timestamp,
                 fileName: finalName,
-                // Result Links
                 video: {
-                    url: downloadLinks.find(f => f.type === 'video' && f.quality === '720p')?.url || downloadLinks.find(f => f.type === 'video')?.url,
-                    quality: "720p",
-                    caption: `🎥 ${title}`
+                    url: videoFile.url,
+                    quality: videoFile.qualityLabel || "360p"
                 },
                 mp3: {
-                    url: downloadLinks.find(f => f.type === 'audio')?.url || downloadLinks[0].url,
-                    mimetype: "audio/mpeg",
-                    fileName: `${finalName}.mp3`
+                    url: audioFile.url,
+                    mimetype: "audio/mpeg"
                 },
                 recording: {
-                    url: downloadLinks.find(f => f.type === 'audio')?.url || downloadLinks[0].url,
+                    url: audioFile.url,
                     ptt: true
                 },
                 document: {
-                    url: downloadLinks.find(f => f.type === 'audio')?.url || downloadLinks[0].url,
-                    mimetype: "audio/mpeg",
+                    url: audioFile.url,
                     fileName: `${finalName}.mp3`
                 }
             }
         });
 
     } catch (err) {
-        console.error("Critical Error:", err.message);
-        // Fallback Error Response
+        console.error("API Error:", err.message);
         return c.json({ 
             status: false, 
-            message: "API server is busy. Please try again in 5 seconds.",
+            message: "YouTube Blocking is too high. Try again later.",
             error: err.message 
         }, 500);
     }
